@@ -1,0 +1,306 @@
+<!doctype html>
+<html>
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <meta http-equiv="Cache-Control" content="no-cache"/>
+    
+    <script>
+        const drawingState = {
+            showCloak: true,
+            showWand: true,
+            showStone: true,
+        }
+
+        // NOTE: onload = https://developer.mozilla.org/ru/docs/Web/API/GlobalEventHandlers/onload
+        function run () {
+            drawDeathlyHallows();
+        }
+
+        function toggleCloak() {
+            drawingState.showCloak = !drawingState.showCloak;
+            drawDeathlyHallows();
+        }
+
+        function toggleWand() {
+            drawingState.showWand = !drawingState.showWand;
+            drawDeathlyHallows();
+        }
+
+        function toggleStone() {
+            drawingState.showStone = !drawingState.showStone;
+            drawDeathlyHallows();
+        }
+
+        async function askAsync() {
+            const teamSecret = "";
+            if (!teamSecret) {
+                alert("Team secret is empty");
+                return;
+            }
+            const challengeClient = new ChallengeClient(teamSecret);
+
+            const askButton = document.getElementById("askButton");
+            askButton.disabled = true;
+
+            await doAskAndAnswerAsync(challengeClient);
+            
+            askButton.disabled = false;
+        }
+
+        async function doAskAndAnswerAsync(challengeClient) {
+            const round = "projects-course-0";
+            const taskType = "starter";
+
+            const askResponse = await challengeClient.askNewTaskAsync(round, taskType);
+            if (!askResponse) {
+                alert("Asking new task has been failed");
+                return;
+            }
+            const {id, typeId, question} = askResponse;
+
+            const answer = "42";
+            const checkResponse = await challengeClient.checkTaskAnswerAsync(id, answer);
+            if (!checkResponse) {
+                alert("Checking task has been failed");
+                return;
+            }
+            const {status} = checkResponse;
+            
+            switch (status) {
+                case 0:
+                    alert("Task status: Pending");
+                    break;
+                case 1:
+                    alert("Task status: Success");
+                    break;
+                case 2:
+                    alert("Task status: Failed");
+                    break;
+                default:
+                    alert("Unknown task status");
+                    break;
+            }
+        }
+
+        function drawDeathlyHallows() {
+            // NOTE: getElementbyId = https://developer.mozilla.org/ru/docs/Web/API/Document/getElementById
+            const canvas = document.getElementById("mainCanvas");
+            const drawer = new Drawer(canvas);
+
+            drawer.fillWithColor(new Color(255, 255, 255));
+
+            const centerX = drawer.width / 2;
+            const centerY = drawer.height / 2;
+            const externalR = Math.min(drawer.width, drawer.height)/2;
+            const internalR = externalR/2;
+            const size = 5;
+
+            if (drawingState.showCloak) {
+                drawCloak(drawer, centerX, centerY, externalR, size);
+            }
+            if (drawingState.showWand) {
+                drawWand(drawer, centerX, centerY, externalR, size);
+            }
+            if (drawingState.showStone) {
+                drawStone(drawer, centerX, centerY, internalR, size);
+            }
+        }
+
+        function drawCloak(drawer, centerX, centerY, radius, size) {
+            const side = Math.sqrt(3)*radius;
+
+            const pointTop = new Point(centerX, centerY - radius);
+            const pointRight = new Point(centerX + side/2, centerY + radius/2);
+            const pointLeft = new Point(centerX - side/2, centerY + radius/2);
+
+            const cloakPoints = [pointTop, pointRight, pointLeft, pointTop];
+            drawer.drawPolyline(cloakPoints, size, "#000000");
+        }
+
+        function drawWand(drawer, centerX, centerY, radius, size) {
+            const pointTop = new Point(centerX, centerY - radius);
+            const pointBottom = new Point(centerX, centerY + radius/2);
+
+            const wandPoints = [pointTop, pointBottom];
+            drawer.drawPolyline(wandPoints, size, "#000000");
+        }
+
+        function drawStone(drawer, centerX, centerY, radius, size) {
+            const stoneColoredPoints = [];
+            for (let x = 0; x < drawer.width; x++) {
+                for (let y = 0; y < drawer.height; y++) {
+                    const r = Math.sqrt((x - centerX)*(x - centerX) + (y - centerY)*(y - centerY));
+                    if (Math.abs(r - radius) <= size/2) {
+                        stoneColoredPoints.push(new ColoredPoint(x, y, new Color(0, 0, 0)));
+                    }
+                }
+            }
+            drawer.drawColoredPoints(stoneColoredPoints);
+        }
+
+        // NOTE: class = https://developer.mozilla.org/ru/docs/Web/JavaScript/Reference/Statements/class
+        class Point {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+            }
+        }
+
+        // NOTE: default parameters = https://developer.mozilla.org/ru/docs/Web/JavaScript/Reference/Functions/Default_parameters 
+        class Color {
+            constructor(red, green, blue, opacity = 255) {
+                this.red = red;
+                this.green = green;
+                this.blue = blue;
+                this.opacity = opacity;
+            }
+        }
+
+        // NOTE: extends = https://developer.mozilla.org/ru/docs/Web/JavaScript/Reference/Classes/extends
+        class ColoredPoint extends Point {
+            constructor(x, y, color) {
+                super(x, y);
+                this.color = color
+            }
+        }
+
+        class Drawer {
+            // NOTE: canvas = https://developer.mozilla.org/ru/docs/Web/API/Canvas_API/Tutorial
+            constructor(canvas) {
+                this.canvas = canvas;
+                this.height = parseInt(canvas.getAttribute("height"));
+                this.width = parseInt(canvas.getAttribute("width"));
+            }
+
+            // NOTE: Рисование изображений = https://developer.mozilla.org/ru/docs/Web/API/Canvas_API/Tutorial/Using_images#%D1%80%D0%B8%D1%81%D0%BE%D0%B2%D0%B0%D0%BD%D0%B8%D0%B5_%D0%B8%D0%B7%D0%BE%D0%B1%D1%80%D0%B0%D0%B6%D0%B5%D0%BD%D0%B8%D0%B9
+            drawPolyline(points, lineWidth = "1", strokeStyle = "#000000") {
+                const context = this.canvas.getContext("2d");
+                context.lineWidth = lineWidth;
+                context.strokeStyle = strokeStyle;
+
+                context.beginPath();
+                for (let i = 0; i < points.length; i++) {
+                    const point = points[i];
+                    if (i === 0)
+                        context.moveTo(point.x, point.y);
+                    else
+                        context.lineTo(point.x, point.y);
+                }
+
+                context.stroke();
+            }
+
+            // NOTE: ImageData = https://developer.mozilla.org/ru/docs/Web/API/ImageData
+            drawColoredPoints(coloredPoints) {
+                const context = this.canvas.getContext("2d");
+                const imageData = context.getImageData(0, 0, this.width, this.height);
+                for (const coloredPoint of coloredPoints) {
+                    const color = coloredPoint.color;
+                    this.__drawColoredPoint(imageData, coloredPoint.x, coloredPoint.y, color);
+                }
+                context.putImageData(imageData, 0, 0);
+            }
+
+            fillWithColor(color) {
+                const context = this.canvas.getContext("2d");
+                const imageData = context.createImageData(this.width, this.height);
+                for (let x = 0; x < this.width; x++)
+                for (let y = 0; y < this.height; y++)
+                {
+                    this.__drawColoredPoint(imageData, x, y, color);
+                }
+                context.putImageData(imageData, 0, 0);
+            }
+
+            __drawColoredPoint(imageData, x, y, color) {
+                // NOTE: Деструктуризирующее присваивание = https://developer.mozilla.org/ru/docs/Web/JavaScript/Reference/Operators/Destructuring_assignment
+                const {red, green, blue, opacity} = color;
+                imageData.data[4*(x + this.width*y) + 0] = Math.max(0, Math.min(red, 255));
+                imageData.data[4*(x + this.width*y) + 1] = Math.max(0, Math.min(green, 255));
+                imageData.data[4*(x + this.width*y) + 2] = Math.max(0, Math.min(blue, 255));
+                imageData.data[4*(x + this.width*y) + 3] = Math.max(0, Math.min(opacity, 255));
+            }
+        }
+
+        class ChallengeClient {
+            constructor(teamSecret) {
+                this.teamSecret = teamSecret;
+                this.baseUrl = "https://www.urfav-challenge.ru";
+            }
+
+            async askNewTaskAsync(round, taskType) {
+                const url = new URL(this.baseUrl + "/api/tasks");
+                url.searchParams.append("secret", this.teamSecret);
+                url.searchParams.append("round", round);
+                url.searchParams.append("type", taskType);
+
+                const response = await fetch(url.toString(), {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                });
+
+                if (response.ok) {
+                    const responseJson = await response.json();
+                    // const {id, typeId, question} = responseJson;
+                    return responseJson;
+                }
+                return null;
+            }
+
+            async checkTaskAnswerAsync(taskId, answer) {
+                const url = new URL(this.baseUrl + "/api/tasks/" + taskId);
+                url.searchParams.append("secret", this.teamSecret);
+                const content = {"answer": answer.toString()};
+
+                const response = await fetch(url.toString(), {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(content)
+                });
+
+                if (response.ok) {
+                    const responseJson = await response.json();
+                    // const success = responseJson.status === 1;
+                    return responseJson;
+                }
+                return null;
+            }
+        }
+    </script>
+
+    <style>
+        .container {
+            width: 500px;
+            margin: 0px auto 0px auto;
+        }
+
+        .buttonPanel {
+            width: 500px;
+            height: 50px;
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+        }
+    </style>
+</head>
+
+<body onload="run()">
+    <div class="container">
+        <div class="buttonPanel">
+            <button id="askButton" onclick="askAsync()">Ask</button>
+        </div>
+        <canvas height="500" width="500" id="mainCanvas"></canvas>
+        <div class="buttonPanel">
+            <button onclick="toggleCloak()">Cloak</button>
+            <button onclick="toggleWand()">Wand</button>
+            <button onclick="toggleStone()">Stone</button>
+        </div>
+    </div>
+</body>
+
+</html>
